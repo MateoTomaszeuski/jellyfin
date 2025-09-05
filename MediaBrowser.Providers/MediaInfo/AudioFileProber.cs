@@ -480,6 +480,8 @@ namespace MediaBrowser.Providers.MediaInfo
         {
             var items = new List<string>();
             var temp = val;
+
+            // Handle whitelisted full artist names (existing behavior)
             foreach (var whitelistItem in whitelist)
             {
                 if (string.IsNullOrWhiteSpace(whitelistItem))
@@ -487,16 +489,25 @@ namespace MediaBrowser.Providers.MediaInfo
                     continue;
                 }
 
-                var originalTemp = temp;
-                temp = temp.Replace(whitelistItem, string.Empty, StringComparison.OrdinalIgnoreCase);
-
-                if (!string.Equals(temp, originalTemp, StringComparison.OrdinalIgnoreCase))
+                // If this is a full artist name (more than just a delimiter), handle as before
+                if (whitelistItem.Length > 1)
                 {
-                    items.Add(whitelistItem);
+                    var originalTemp = temp;
+                    temp = temp.Replace(whitelistItem, string.Empty, StringComparison.OrdinalIgnoreCase);
+
+                    if (!string.Equals(temp, originalTemp, StringComparison.OrdinalIgnoreCase))
+                    {
+                        items.Add(whitelistItem);
+                    }
                 }
             }
 
-            var items2 = temp.Split(tagDelimiters, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).DistinctNames();
+            // Create a list of delimiters to actually use for splitting
+            // Remove any single-character delimiters that are whitelisted
+            var whitelistedDelimiters = whitelist.Where(w => !string.IsNullOrWhiteSpace(w) && w.Length == 1).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var effectiveDelimiters = tagDelimiters.Where(d => !whitelistedDelimiters.Contains(d.ToString())).ToArray();
+
+            var items2 = temp.Split(effectiveDelimiters, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).DistinctNames();
             items.AddRange(items2);
 
             return items;
